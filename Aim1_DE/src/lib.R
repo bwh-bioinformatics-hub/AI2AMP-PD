@@ -79,8 +79,8 @@ topGOenrichment <- function(list_of_gene_names, allGenes, topN=100, pCutoff=0.00
                   ID = "symbol")
     resultFisher <- runTest(GOdata, algorithm = "weight01", statistic = "fisher") # weight01 is a mixture between the elim and the weight algorithms
     # multiple test using all used GO (Ref: https://www.biostars.org/p/143083/) ---- not a practical sulution: nothing left after padj
-    # gtable = GenTable(GOdata, classicFisher = resultFisher, topNodes = length(usedGO(GOdata)), numChar=100)
-    gtable = GenTable(GOdata, classicFisher = resultFisher, topNodes = topN, numChar=100)
+    gtable = GenTable(GOdata, classicFisher = resultFisher, topNodes = length(usedGO(GOdata)), numChar=100)
+    # gtable = GenTable(GOdata, classicFisher = resultFisher, topNodes = topN, numChar=100)
     gtable$classicFisher = as.numeric(gtable$classicFisher)
     gtable$classicFisher = ifelse(is.na(gtable$classicFisher), 1e-30, gtable$classicFisher);  # GenTable default trim anything <1e-30 as "<1e-30"
     gtable$padj = p.adjust(gtable$classicFisher, method='fdr')
@@ -133,10 +133,11 @@ ORA <- function(inputGenes, allGenes, topN=20, nCutoff=3, pCutoff=0.01, output='
   allGenes=toupper(unique(na.omit(allGenes))) # remove NA (for the otholog cases)
   
   gt=data.frame();
-  for(i in c("c5.go.bp","c5.go.cc", "c5.go.mf","c2.cp.kegg")){
+  for(i in c("c5.go.bp","c5.go.cc", "c5.go.mf","c2.cp.kegg","c2.cp.wikipathways")){
   #for(i in c("c2.cp.biocarta","c2.cp.reactome","c2.cp.kegg")){
     message(i);
-    gmt.file = paste0("/Volumes/neurogen/referenceGenome/Homo_sapiens/UCSC/hg19/Annotation/msigdb_v7.2/msigdb_v7.2_GMTs/",i,".v7.2.symbols.gmt")
+#     gmt.file = paste0("/data/neurogen/referenceGenome/Homo_sapiens/UCSC/hg19/Annotation/msigdb_v7.2/msigdb_v7.2_GMTs/",i,".v7.2.symbols.gmt")
+    gmt.file = paste0("/data/neurogen/AMPPD/data/msigdb_v7.4/msigdb_v7.4_GMTs/",i,".v7.4.symbols.gmt")
     pathwayLines <- strsplit(readLines(gmt.file), "\t")
     pathways <- lapply(pathwayLines, utils::tail, -2)
     pathways = as.data.frame(cbind(do.call(rbind, lapply(pathwayLines,head,2)), geneset=pathways))

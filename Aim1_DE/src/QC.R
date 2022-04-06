@@ -2,19 +2,23 @@
 # Rscript to do the qulity control(QC) processes
 # Usage: Rscript QC.R RNA_expr_matrix_file Sample_mate_info_file output_folder
 ###########################################
-if (!require(ape)) install.packages('ape'); library(ape)
-if (!require(reshape2)) install.packages('reshape2'); library(reshape2)
+if (!require(ape)) install.packages('ape'); library('ape');
+if (!require(ape)) install.packages('eulerr'); library('eulerr');
+if (!require(reshape2)) install.packages('reshape2'); library(reshape2);
+if (!require(ggplot2)) install.packages('ggplot2'); library(ggplot2);
 require('RColorBrewer',quietly=T, warn.conflicts=F) || install.packages('RColorBrewer', repo='http://cran.rstudio.com');
 library(ggplot2)
+library(matrixStats)
 
 args<-commandArgs(TRUE)
 
 expr_file=args[1]  # either filename or stdin
-mate_file=args[2]
-prefix=args[3]
+expr_file_cts=args[2]
+mate_file=args[3]
+prefix=args[4]
+message(prefix)
 
 output_folder = paste0("../results/", prefix,"/QC")
-expr_file_cts = paste0(prefix,"_read_Train.txt")
 
 dir.create(output_folder, recursive = T, showWarnings = FALSE)
 
@@ -258,7 +262,7 @@ D_lt85 = names(D[D<0.85])
 # 6. Venn plot: RLE_r100 & D<0.85
 ##====================================
 message("[INFO] 6. Venn: RLE_r100 & D<0.85...")
-library('eulerr')
+
 set1 <- bymedian_lvl_R
 set2 <- D_lt85
 myCol <- c(rainbow(2))
@@ -376,6 +380,70 @@ for (i in c(3,4,5)){
   p <- p + theme(axis.text.x = element_text(size = 10, color = "black", vjust = 0.5, hjust = 0.5, angle = 0))
   p <- p + theme(axis.text.y = element_text(size = 10, color = "black", vjust = 0.5, hjust = 0.5, angle = 0))
   p = p + ggtitle("PCA-plot of PPMI using log2(TPM+1)") + theme(plot.title = element_text(hjust = 0.5))
+
+  p1 <- p + stat_ellipse(level = 0.95, linetype = 4)
+  # p2 <- p + geom_text(aes(x = PC1, y = PC2, label= File_ID))
+
+  print(p1)
+  # print(p2)
+}
+dev.off()
+
+#####################
+message("[INFO] 9. PCA plot...top500")
+ntop = 500
+log_tpm = log(tpm+1,2)
+rv <- rowVars(as.matrix(log_tpm))
+# select the ntop genes by variance
+select <- order(rv, decreasing=TRUE)[seq_len(min(ntop, length(rv)))]
+topn_log_tpm = log_tpm[select,]
+
+pca_res = prcomp(t(topn_log_tpm))
+pdf( paste0(output_folder,"/9.QC.PCA_plot_top500.pdf"), 8, 6)
+screeplot(pca_res, type = "l", npcs = 10, main = "Screeplot of the first 10 PCs")
+abline(h = 1, col="red", lty=5)
+legend("topright", legend=c("Eigenvalue = 1"), col=c("red"), lty=5, cex=0.6)
+
+cumpro <- cumsum(pca_res$sdev^2 / sum(pca_res$sdev^2))
+plot(cumpro[0:20], xlab = "PC #", ylab = "Amount of explained variance", main = "Cumulative variance plot")
+abline(v = 10, col="blue", lty=5)
+abline(h = 0.88759, col="blue", lty=5)
+legend("topleft", legend=c("Cut-off @ PC10"), col=c("blue"), lty=5, cex=0.6)
+
+## PCA plot
+library("factoextra")
+fviz_pca_ind(pca_res, geom.ind = "point", pointshape = 21,
+             pointsize = 2,
+             fill.ind = covarianceTable$CONDITION,
+             col.ind = "black",
+             palette = "jco",
+             addEllipses = TRUE,
+             label = "var",
+             col.var = "black",
+             repel = TRUE,
+             legend.title = "Group") +
+  ggtitle("PCA-plot of PPMI using log2(TPM+1) - Top500") +
+  theme(plot.title = element_text(hjust = 0.5))
+
+####
+percentVar = round(100 * pca_res$sdev^2/ sum(pca_res$sdev^2))
+pcdata = as.data.frame(pca_res$x[,1:2])
+pcdata = cbind(pcdata,covarianceTable$CONDITION,covarianceTable$sex,covarianceTable$race)
+mycolor <- c(brewer.pal(9,"Set1"),brewer.pal(8, "Set2"),brewer.pal(12,"Set3")[c(-2,-12)],brewer.pal(12,"Paired"))
+
+for (i in c(3,4,5)){
+  pcdata_clean = pcdata[,c(1:2,i)]
+  title = colnames(pcdata_clean)[3]
+  print(title)
+  colnames(pcdata_clean)[3] = "Category"
+  p <- ggplot(data = pcdata_clean, aes(x = PC1, y = PC2, color = Category)) + geom_point(size=1,shape=16)
+  p = p + xlab(paste0("PC1: ", percentVar[1], "% variance")) + ylab(paste0("PC2: ", percentVar[2], "% variance"))
+  p <- p + theme_bw() + scale_color_manual(values = mycolor[1:20])
+  p <- p + theme(axis.title.x = element_text(size = 10, color = "black", angle = 0))
+  p <- p + theme(axis.title.y = element_text(size = 10, color = "black", angle = 90))
+  p <- p + theme(axis.text.x = element_text(size = 10, color = "black", vjust = 0.5, hjust = 0.5, angle = 0))
+  p <- p + theme(axis.text.y = element_text(size = 10, color = "black", vjust = 0.5, hjust = 0.5, angle = 0))
+  p = p + ggtitle("PCA-plot of PPMI using log2(TPM+1) - Top500 ") + theme(plot.title = element_text(hjust = 0.5))
 
   p1 <- p + stat_ellipse(level = 0.95, linetype = 4)
   # p2 <- p + geom_text(aes(x = PC1, y = PC2, label= File_ID))

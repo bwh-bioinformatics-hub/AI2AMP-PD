@@ -14,23 +14,25 @@ suppressPackageStartupMessages(library('pathview',logical.return=T)) || {BiocMan
 
 require('BiocParallel',quietly=T, warn.conflicts=F) || BiocManager::install('BiocParallel');
 
-
+set.seed(12)
 args<-commandArgs(TRUE)
 
 prefix=args[1]
-# prefix="PPMI_CaseAll_CtrlNonCarrier_allgene_DEanalysis"
+# prefix="PDBF_CaseA_CtrlA"
 
-output_dir = paste0("/Volumes/NEUROGEN/AMPPD/Aim1_DE/results/", prefix,"/Enrich")
+output_dir = paste0("../results/", prefix,"/Enrich")
 
 # Create folder if the directory doesn't exist
 file.exists(output_dir) || dir.create(output_dir, recursive = T)
 
 
-input_DE_result=  paste0("../results/",prefix,"/DE/DEresult.all.resLFC.xls.gz")
+input_DE_result=  paste0("../results/",prefix,"/DE/DEresult.all.xls.gz")
+# input_DE_result=  paste0("../results/",prefix,"/replicated/replicated_genes_same_direction.txt")
 topN=20
 Q_CUTOFF=0.05
 index="hg19"
 filters="medium"
+# filters="no"
 program="all"
 
 if(is.null(program)) program="all"
@@ -70,14 +72,13 @@ if(nrow(DE_result)<=5) {stop(paste(input_DE_result, "has too few (<=5) records. 
 
 source("lib.R")
 
-setwd(output_dir)
 ##==================================================
 message("2. running GO terms enrichment anlaysis")
 ##==================================================
 if(("symbol" %in% colnames(DE_result)) && (program=="all" || grepl("GO",program))) {
   ## require: only gene symbol
 
-  df <- read.table("/Volumes/NEUROGEN/referenceGenome/Homo_sapiens/UCSC/hg19/Annotation/Genes/genes.bed", stringsAsFactors =F)
+  df <- read.table("/data/neurogen/referenceGenome/Homo_sapiens/UCSC/hg19/Annotation/Genes/genes.bed", stringsAsFactors =F)
   gene_names = df$V7[df$V8=="protein_coding"]
 
   # all DE genes
@@ -127,10 +128,10 @@ if(all(c('symbol', 'log2FoldChange') %in% colnames(DE_result)) && (program=="all
   for(i in c("c2.cp","c2.cp.kegg", "c2.cgp","c3.tft", "c7.all")){
     message(i);
 
-    gmt.file = paste0("/Volumes/NEUROGEN/referenceGenome/Homo_sapiens/UCSC/hg19/Annotation/msigdb_v7.2/msigdb_v7.2_GMTs/",i,".v7.2.symbols.gmt")
+    gmt.file = paste0("/data/neurogen/referenceGenome/Homo_sapiens/UCSC/hg19/Annotation/msigdb_v7.2/msigdb_v7.2_GMTs/",i,".v7.2.symbols.gmt")
 
     pathways = gmtPathways(gmt.file)
-    fgseaRes = fgsea(pathways, stats=ranks, minSize=10, maxSize=500, nperm=10000)
+    fgseaRes = fgseaMultilevel(pathways, stats=ranks, minSize=10, maxSize=500)
     fgseaRes = fgseaRes[order(fgseaRes$padj),]  # default is BH-adjusted p-value, same as FDR
 
     # get FDR < 0.05 pathways
@@ -151,74 +152,74 @@ if(all(c('symbol', 'log2FoldChange') %in% colnames(DE_result)) && (program=="all
 
 }
 
-## require: only gene symbol and log2FoldChange
-if(all(c('symbol', 'log2FoldChange') %in% colnames(DE_result)) && (program=="all" || grepl("SPIA",program))){
-  ###################################################
-  message("#Step4: SPIA analysis")
-  ###################################################
-  ## Prerequisition
-  # download all KEGG pathway and install in SPIA
-  # cd /Library/Frameworks/R.framework/Versions/4.0/Resources/library/SPIA
-  # curl -s http://rest.kegg.jp/list/pathway/hsa | awk '{split($1,a,":"); print "curl http://rest.kegg.jp/get/"a[2]"/kgml -o extdata/keggxml/hsa/"a[2]".xml"}' | bash
-  # curl -s http://rest.kegg.jp/list/pathway/hsa | awk '{split($1,a,":"); print "curl http://rest.kegg.jp/get/"a[2]"/image -o extdata/keggxml/hsa/"a[2]".png"}' | bash
-  #library(SPIA)
-  #makeSPIAdata(kgml.path=system.file("extdata/keggxml/hsa",package="SPIA"),organism="hsa",out.path="./extdata")
-
-  # add ENTREZ ID using the human_orth_symbol (as Pathway data might be more enriched in human data)
-  # Note: ortholog genes (e.g. PAX6 in human and Pax6 in mouse) have different ENTREZ ID
-  human_orth_Entrez = mapIds(org.Hs.eg.db,
-                             keys = DE_result$human_orth_symbol,
-                             column = "ENTREZID",
-                             keytype = "SYMBOL",
-                             multiVals='first')
-  DE_result$human_orth_Entrez = as.numeric(human_orth_Entrez) # NA for those genes without Entrez ID
-  degGIs <- as.vector(DE_result$log2FoldChange)
-  names(degGIs) <- DE_result$human_orth_Entrez
-  # remove NA
-  degGIs <- degGIs[!is.na(names(degGIs))]
-  # remove duplicate
-  degGIs=degGIs[!duplicated(names(degGIs))]
-
-  res <- spia(de=degGIs,
-              all=mappedkeys(org.Hs.egGENENAME),
-              organism='hsa',
-              nB=2000, plots=FALSE,
-              beta=NULL,
-              combine="fisher")
-
-  ## A data frame containing the ranked pathways and various statistics:
-  # pSize is the number of genes on the pathway;
-  # NDE is the number of DE genes per pathway;
-  # tA is the observed total preturbation accumulation in the pathway;
-  # pNDE is the probability to observe at least NDE genes on the pathway using a hypergeometric model;
-  # pPERT is the probability to observe a total accumulation more extreme than tA only by chance;
-  # pG is the p-value obtained by combining pNDE and pPERT;
-  # pGFdr and pGFWER are the False Discovery Rate and respectively Bonferroni adjusted global p-values;
-  # Status gives the direction in which the pathway is perturbed (activated or inhibited).
-  # KEGGLINK gives a web link to the KEGG website that displays the pathway image with the differentially expressed genes highlighted in red.
-
-  # add color code to the KEGGLINK based on fold-change of each DE gene
-  # Potential issue: some pathways are not in the Pathview web server and it will return an error (see https://support.bioconductor.org/p/90506/)
-
-  library(pathview) # BiocManager::install("pathview",ask=F);
-  sapply(filter(res, pGFdr<Q_CUTOFF, !(ID %in% c("04723","04320","04215","05206")), file.exists(paste0("~/Downloads/hsa/hsa",ID,".xml")),
-                !file.exists(paste0("hsa",ID,".","AMPPD",".png"))) %>% dplyr::select(ID),
-         function(pid) pathview(gene.data  = degGIs,
-                                pathway.id = pid,
-                                species = "hsa",
-                                kegg.dir = "~/Downloads/hsa/",
-                                out.suffix = "AMPPD",
-                                limit  = list(gene=max(abs(degGIs)), cpd=1))
-         )
-
-  # make text file and plot
-  write.table(subset(res, pGFdr<Q_CUTOFF), file.path(output_dir, 'SPIA.xls'), sep="\t", quote=F, row.names=F, col.names=T)
-
-  pdf(file.path(output_dir, 'SPIA.pdf'))
-  plotP(res, threshold=Q_CUTOFF)
-  res$ID=res$Name;
-  plotP(res, threshold=Q_CUTOFF)
-  dev.off()
-}
+# ## require: only gene symbol and log2FoldChange
+# if(all(c('symbol', 'log2FoldChange') %in% colnames(DE_result)) && (program=="all" || grepl("SPIA",program))){
+#   ###################################################
+#   message("#Step4: SPIA analysis")
+#   ###################################################
+#   ## Prerequisition
+#   # download all KEGG pathway and install in SPIA
+#   # cd /Library/Frameworks/R.framework/Versions/4.0/Resources/library/SPIA
+#   # curl -s http://rest.kegg.jp/list/pathway/hsa | awk '{split($1,a,":"); print "curl http://rest.kegg.jp/get/"a[2]"/kgml -o extdata/keggxml/hsa/"a[2]".xml"}' | bash
+#   # curl -s http://rest.kegg.jp/list/pathway/hsa | awk '{split($1,a,":"); print "curl http://rest.kegg.jp/get/"a[2]"/image -o extdata/keggxml/hsa/"a[2]".png"}' | bash
+#   #library(SPIA)
+#   #makeSPIAdata(kgml.path=system.file("extdata/keggxml/hsa",package="SPIA"),organism="hsa",out.path="./extdata")
+#
+#   # add ENTREZ ID using the human_orth_symbol (as Pathway data might be more enriched in human data)
+#   # Note: ortholog genes (e.g. PAX6 in human and Pax6 in mouse) have different ENTREZ ID
+#   human_orth_Entrez = mapIds(org.Hs.eg.db,
+#                              keys = DE_result$human_orth_symbol,
+#                              column = "ENTREZID",
+#                              keytype = "SYMBOL",
+#                              multiVals='first')
+#   DE_result$human_orth_Entrez = as.numeric(human_orth_Entrez) # NA for those genes without Entrez ID
+#   degGIs <- as.vector(DE_result$log2FoldChange)
+#   names(degGIs) <- DE_result$human_orth_Entrez
+#   # remove NA
+#   degGIs <- degGIs[!is.na(names(degGIs))]
+#   # remove duplicate
+#   degGIs=degGIs[!duplicated(names(degGIs))]
+#
+#   res <- spia(de=degGIs,
+#               all=mappedkeys(org.Hs.egGENENAME),
+#               organism='hsa',
+#               nB=2000, plots=FALSE,
+#               beta=NULL,
+#               combine="fisher")
+#
+#   ## A data frame containing the ranked pathways and various statistics:
+#   # pSize is the number of genes on the pathway;
+#   # NDE is the number of DE genes per pathway;
+#   # tA is the observed total preturbation accumulation in the pathway;
+#   # pNDE is the probability to observe at least NDE genes on the pathway using a hypergeometric model;
+#   # pPERT is the probability to observe a total accumulation more extreme than tA only by chance;
+#   # pG is the p-value obtained by combining pNDE and pPERT;
+#   # pGFdr and pGFWER are the False Discovery Rate and respectively Bonferroni adjusted global p-values;
+#   # Status gives the direction in which the pathway is perturbed (activated or inhibited).
+#   # KEGGLINK gives a web link to the KEGG website that displays the pathway image with the differentially expressed genes highlighted in red.
+#
+#   # add color code to the KEGGLINK based on fold-change of each DE gene
+#   # Potential issue: some pathways are not in the Pathview web server and it will return an error (see https://support.bioconductor.org/p/90506/)
+#
+#   library(pathview) # BiocManager::install("pathview",ask=F);
+#   sapply(filter(res, pGFdr<Q_CUTOFF, !(ID %in% c("04723","04320","04215","05206")), file.exists(paste0("~/Downloads/hsa/hsa",ID,".xml")),
+#                 !file.exists(paste0("hsa",ID,".","AMPPD",".png"))) %>% dplyr::select(ID),
+#          function(pid) pathview(gene.data  = degGIs,
+#                                 pathway.id = pid,
+#                                 species = "hsa",
+#                                 kegg.dir = "~/Downloads/hsa/",
+#                                 out.suffix = "AMPPD",
+#                                 limit  = list(gene=max(abs(degGIs)), cpd=1))
+#          )
+#
+#   # make text file and plot
+#   write.table(subset(res, pGFdr<Q_CUTOFF), file.path(output_dir, 'SPIA.xls'), sep="\t", quote=F, row.names=F, col.names=T)
+#
+#   pdf(file.path(output_dir, 'SPIA.pdf'))
+#   plotP(res, threshold=Q_CUTOFF)
+#   res$ID=res$Name;
+#   plotP(res, threshold=Q_CUTOFF)
+#   dev.off()
+# }
 
 

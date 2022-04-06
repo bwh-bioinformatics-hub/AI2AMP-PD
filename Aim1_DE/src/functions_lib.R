@@ -70,8 +70,16 @@ rfcv1 <- function(trainx, trainy, cv.fold = 5, scale = "log", step = 0.5,output_
   list(n.var = n.var, error.cv = error.cv, predicted = cv.pred, res = res)
 }
 
-
+library(mRMRe)
 mRMR_features <- function(train, output_dir, cv.fold = 5,cv.time=5, scale = "log", step = 2,marker.num=0){
+set.thread.count(4)
+  dd <- mRMR.data(data =  data.frame(train))
+  filter <- mRMR.ensemble(data = dd, target_indices = ncol(train), levels=c(1:ncol(train)-1))
+  return()
+}
+
+
+mRMR_features_old <- function(train, output_dir, cv.fold = 5,cv.time=5, scale = "log", step = 2,marker.num=0){
   set.seed(0)
   
   train.x <- train[, !names(train) %in% c("Y")]
@@ -131,12 +139,12 @@ LASSO_features <- function(train, output_dir){
 
   df_coef <- round(as.matrix(coef(cv.lasso, s=cv.lasso$lambda.min)), 4)
   # See all contributing variables
+  df_coef.dir <- paste0(output_dir, "/lasso_coef.txt")
+  write.table(df_coef, df_coef.dir, col.names = F, sep = "\t", quote = F)
+
   df_coef = df_coef[df_coef[, 1] != 0, ,drop=FALSE]
   df_coef = df_coef[ !rownames(df_coef)=='(Intercept)', ,drop=FALSE]
   # df_coef = df_coef[order(df_coef[, 1]), ,drop=FALSE]
-
-  df_coef.dir <- paste0(output_dir, "/lasso_coef.txt")
-  write.table(df_coef, df_coef.dir, col.names = F, sep = "\t", quote = F)
 
   marker.p = variables<-row.names(df_coef)
   return(marker.p)
@@ -145,13 +153,14 @@ LASSO_features <- function(train, output_dir){
 
 library(pROC)
 # function
-plot_roc <- function(response, predictor, direction = "auto") {
-  print(paste0("warning: levels of respone is ", paste(levels(as.factor(response)), collapse = ", "), " and should corresponding to controal and case, the default direction is auto"))
+plot_roc <- function(response, predictor, direction = "auto",main="plot") {
+  print(paste0("warning: levels of respone is ", paste(levels(as.factor(response)), collapse = ", "),
+               " and should corresponding to controal and case, the default direction is auto"))
   roc.obj <- roc(response, predictor, percent = T, ci = T, plot = T, direction = direction)
   ci.se.obj <- ci.se(roc.obj, specificities = seq(0, 100, 5))
   plot(ci.se.obj, type = "shape", col = rgb(0, 1, 0, alpha = 0.2))
   plot(ci.se.obj, type = "bars")
-  plot(roc.obj, col = 2, add = T)
+  plot(roc.obj, col = 2, add = T,main=main)
   txt <- c(paste("AUC=", round(roc.obj$ci[2], 2), "%"), paste("95% CI:", round(roc.obj$ci[1], 2), "%-", round(roc.obj$ci[3], 2),
     "%"))
   legend("bottomright", txt)

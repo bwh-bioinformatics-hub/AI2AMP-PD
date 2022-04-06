@@ -19,6 +19,11 @@ meta_data_test = args[4]
 prefix = args[5]
 feature_selection = args[6]
 
+cat("======================\n","Train set:\n",expr_data_train,"\n",meta_data_train,"\n")
+cat("======================\n","Test set:\n",expr_data_test,"\n",meta_data_test,"\n")
+cat("======================\n","Feature selection:\n",feature_selection,"\n")
+cat("======================\n","Run model Random forest\n")
+
 cv.fold = 5
 cv.time = 5 
 scale = "seq"
@@ -36,9 +41,12 @@ output_dir = paste0("../results/", prefix,"/MultiG/RF_",feature_selection)
 # Create folder if the directory doesn't exist
 file.exists(output_dir) || dir.create(output_dir, recursive = T)
 
-DE_gene_file=paste0("../results/",prefix,"/DE/DEresult.padj05.resLFC.xls")
+DE_gene_file=paste0("../results/",prefix,"/DE/DEresult.all.xls.gz")
 DE_gene_data = read.delim(DE_gene_file, stringsAsFactors=F, row.names = 1, header=T, check.names =F)
+DE_gene_data = DE_gene_data[(DE_gene_data$padj < 0.1) & (!is.na(DE_gene_data$padj)),]
+
 feature_ls = rownames(DE_gene_data)
+cat("Total feature number:", length(feature_ls),"\n")
 
 # data
 expr_data_train = read.table(paste0("../run_inout/",expr_data_train),sep="\t",head=T,row.names=1,check.names=F)
@@ -46,11 +54,17 @@ expr_data_test = read.table(paste0("../run_inout/",expr_data_test),sep="\t",head
 meta_data_train = read.table(paste0("../run_inout/",meta_data_train),sep="\t",head=T,row.names=1,check.names=F)
 meta_data_test = read.table(paste0("../run_inout/",meta_data_test),sep="\t",head=T,row.names=1,check.names=F)
 
+cat("Train sample size:", dim(expr_data_train),"\n")
+cat("Test sample size:", dim(expr_data_test),"\n")
+
+expr_data_train = expr_data_train[,rownames(meta_data_train)]
 train_data = as.data.frame(t(expr_data_train))[,feature_ls]
 train_data$Y = ifelse(meta_data_train$case_control_other_latest =='Case', 1, 0)
 
+expr_data_test = expr_data_test[,rownames(meta_data_test)]
 test_data = as.data.frame(t(expr_data_test))[,feature_ls]
 test_data$Y = ifelse(meta_data_test$case_control_other_latest =='Case', 1, 0)
+
 
 # package
 library(randomForest)
@@ -62,7 +76,6 @@ train.x <- train_data[, !names(train_data) %in% c("Y")]
 train.y <- as.factor(train_data$Y)
 train.l <- levels(train.y)
 levels(train.y) <- 0:1
-
 
 test.x <- test_data[, !names(test_data) %in% c("Y")]
 test.y <- as.factor(test_data$Y)
@@ -81,6 +94,8 @@ if(feature_selection=="mrmr"){
 }else{
   marker.p = feature_ls
 }
+cat("Selected feature number:", length(marker.p),"\n")
+write.table(marker.p,paste0(output_dir, "/RandomForest_Features.txt"), sep = "\t", quote = F, col.names = NA)
 
 # train model
 train.rf <- randomForest(train.x[, marker.p], train.y, importance = T)
@@ -111,7 +126,7 @@ colnames(train.pp)=c("predict_probability","predict_group","true_group")
 write.table(train.pp, pr.dir, sep = "\t", quote = F, col.names = NA)
 
 # train ROC
-plot_roc(train.y, train.p[, 2])
+plot_roc(train.y, train.p[, 2],main="Train set")
 
 # test predict
 test.p <- predict(train.rf, test.x, type = "prob")
@@ -144,7 +159,7 @@ legend("bottomright", txt, col = c("#F8766D","#00BFC4"), pch = 16)
 abline(h = 0.5)
 
 # test ROC
-plot_roc(test.y, test.p[, 2])
+plot_roc(test.y, test.p[, 2],main="Test set")
 dev.off()
 
 #####################################importance

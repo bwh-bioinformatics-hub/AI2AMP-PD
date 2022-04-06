@@ -22,7 +22,7 @@ with open("../../data/participant_info_full_results_04212021_unique_id.tsv", "r"
         if age_at_diagnosis == "NA":
             earliest = "NA"
         else:
-            # print(age_at_diagnosis)
+            print(age_at_diagnosis)
             ## check the disease age, if it is not 'NA', the final earliest diagnosis age will be set to the earlist Non-zero value
             age_ls = sorted(list(set([int(i) for i in age_at_diagnosis.split("|")])))
             earliest = age_ls[0]
@@ -62,53 +62,17 @@ print(participants_with_cohort.info())
 columns = ['participant_id', 'disease_year', 'DoD', "missing_flag"]
 participants = participants.loc[:, columns]
 
-## Case vs Control
-case_control_df = pd.read_csv(output_folder+"/run_inout/"+Study+"_CaseAll_CtrlNonCarrier.tsv", index_col=None, header=0, sep="\t")
-print(case_control_df.shape)
-full_cov_table = pd.merge(case_control_df, participants, how="left", on="participant_id", suffixes=("", "_y"))
-full_cov_table.loc[(full_cov_table['case_control_other_latest'] == 'Control'), ["DoD"]] = 0
-full_cov_table= full_cov_table.loc[~(full_cov_table['missing_flag'].isin(['Diag_Age_NA','Base_Age_NA'])),:]
-full_cov_table = full_cov_table.loc[:,["sample_id","participant_id","visit_month","case_control_other_latest",
-                                       "Plate","RIN","Study","sex","age_at_baseline","race","PRS","Mutation","DoD"]]
-full_cov_table.to_csv(output_folder+"/run_inout/"+Study+"_CaseAll_CtrlNonCarrier_covariates.tsv", sep="\t", index=False)
-
-## Control Carrier vs Control Non-Carrier
-carrier_df = pd.read_csv(output_folder+"/run_inout/"+Study+"_Ctrl_Carriers_Non.tsv", index_col=None, header=0, sep="\t")
-print(carrier_df.shape)
-full_cov_table_Carrier = pd.merge(carrier_df, participants, how="left", on="participant_id", suffixes=("", "_y"))
-full_cov_table_Carrier.loc[(full_cov_table_Carrier['case_control_other_latest'] == 'Control'), ["DoD"]] = 0
-full_cov_table_Carrier = full_cov_table_Carrier.loc[~(full_cov_table_Carrier['missing_flag'].isin(['Diag_Age_NA','Base_Age_NA'])),:]
-full_cov_table_Carrier = full_cov_table_Carrier.loc[:,["sample_id","participant_id","visit_month","case_control_other_latest",
-                                       "Plate","RIN","Study","sex","age_at_baseline","race","PRS","Mutation","DoD"]]
-full_cov_table_Carrier.to_csv(output_folder+"/run_inout/"+Study+"_Ctrl_Carriers_Non_covariates.tsv", sep="\t", index=False)
-
-## Case Carrier vs Control Non-Carrier
-casecarrier_controlnon_df = pd.read_csv(output_folder+"/run_inout/"+Study+"_CC_CN.tsv", index_col=None, header=0, sep="\t")
-print(casecarrier_controlnon_df.shape)
-full_cov_table_CC_CN_df = pd.merge(casecarrier_controlnon_df, participants, how="left", on="participant_id", suffixes=("", "_y"))
-full_cov_table_CC_CN_df.loc[(full_cov_table_CC_CN_df['case_control_other_latest'] == 'Control'), ["DoD"]] = 0
-full_cov_table_CC_CN_df = full_cov_table_CC_CN_df.loc[
-                                           ~(full_cov_table_CC_CN_df['missing_flag'].isin(['Diag_Age_NA','Base_Age_NA'])),:]
-full_cov_table_CC_CN_df = full_cov_table_CC_CN_df.loc[:,["sample_id","participant_id","visit_month","case_control_other_latest",
-                                       "Plate","RIN","Study","sex","age_at_baseline","race","PRS","Mutation","DoD"]]
-full_cov_table_CC_CN_df.to_csv(output_folder+"/run_inout/"+Study+"_CC_CN_covariates.tsv", sep="\t", index=False)
-
-## Case Carrier vs Control Non-Carrier
-caseall_ctrlall_df = pd.read_csv(output_folder+"/run_inout/"+Study+"_Case_Ctrl_all.tsv", index_col=None, header=0, sep="\t")
-print(caseall_ctrlall_df.shape)
-full_cov_table_CA_CA_df = pd.merge(caseall_ctrlall_df, participants, how="left", on="participant_id", suffixes=("", "_y"))
-full_cov_table_CA_CA_df.loc[(full_cov_table_CA_CA_df['case_control_other_latest'] == 'Control'), ["DoD"]] = 0
-full_cov_table_CA_CA_df = full_cov_table_CA_CA_df.loc[
-                                           ~(full_cov_table_CA_CA_df['missing_flag'].isin(['Diag_Age_NA','Base_Age_NA'])),:]
-full_cov_table_CA_CA_df = full_cov_table_CA_CA_df.loc[:,["sample_id","participant_id","visit_month","case_control_other_latest",
-                                       "Plate","RIN","Study","sex","age_at_baseline","race","PRS","Mutation","DoD"]]
-
-
-
-
-
-## End
-
+col_ls = ["sample_id","participant_id","Study","visit_month","case_control_other_latest",
+          "upsit_total_score", "moca_total_score","Plate","RIN","sex","age_at_baseline","race",
+          "PRS","GBA","LRRK2","SNCA","Mutation","DoD","study_arm","pd_medication_start_months_after_baseline","treat"]
+# 0. CaseA vs ControlA
+case_control_df = pd.read_csv(output_folder+"/run_inout/"+Study+"_CaseA_CtrlA.tsv", index_col=None, header=0, sep="\t")
+print("CA_CA:",case_control_df.shape)
+full_cov_table_df = pd.merge(case_control_df, participants, how="left", on="participant_id", suffixes=("", "_y"))
+full_cov_table_df.loc[(full_cov_table_df['case_control_other_latest'] == 'Control'), ["DoD"]] = 0
+full_cov_table_df= full_cov_table_df.loc[~(full_cov_table_df['missing_flag'].isin(['Diag_Age_NA','Base_Age_NA'])),:]
+full_cov_table_df = full_cov_table_df.loc[:,col_ls]
+print(full_cov_table_df.info())
 #####################################
 ## check
 # Case_DoD = full_cov_table.loc[(full_cov_table['case_control_other_latest'] == 'Case'), ["missing_flag"]]
@@ -120,48 +84,19 @@ full_cov_table_CA_CA_df = full_cov_table_CA_CA_df.loc[:,["sample_id","participan
 # plt.title("Distribution of DoD PPMI Case baseline samples")
 # plt.close()
 
-if Study=="PDBP" or Study=="PDBF" :
-    ## 2 samples with very big DoD, By checking the reacord in BigQuery tables, there are multiple diagnosis ages, and I made the following changes
-    full_cov_table.loc[full_cov_table['sample_id'] == "PD-PDDR399XYQ-BLM0T1", ['DoD']] = 6
-    full_cov_table_Carrier.loc[full_cov_table_Carrier['sample_id'] == "PD-PDDR399XYQ-BLM0T1", ['DoD']] = 6
-    full_cov_table_CC_CN_df.loc[full_cov_table_CC_CN_df['sample_id'] == "PD-PDDR399XYQ-BLM0T1", ['DoD']] = 6
-    full_cov_table_CA_CA_df.loc[full_cov_table_CA_CA_df['sample_id'] == "PD-PDDR399XYQ-BLM0T1", ['DoD']] = 6
+if Study=="PDBP" or Study=="PDBF" or Study=="PPB" :
+    # 2 samples with very big DoD, By checking the reacord in BigQuery tables, there are multiple diagnosis ages, and I made the following changes
+    full_cov_table_df.loc[full_cov_table_df['sample_id'] == "PD-PDDR399XYQ-BLM0T1", ['DoD']] = 6
+    full_cov_table_df.loc[full_cov_table_df['sample_id'] == "PD-PDDR399XYQ-BLM0T1", ['missing_flag']] = 6
 
-    full_cov_table.loc[full_cov_table['sample_id'] == "PD-PDDR399XYQ-BLM0T1", ['missing_flag']] = 6
-    full_cov_table_Carrier.loc[full_cov_table_Carrier['sample_id'] == "PD-PDDR399XYQ-BLM0T1", ['missing_flag']] = 6
-    full_cov_table_CC_CN_df.loc[full_cov_table_CC_CN_df['sample_id'] == "PD-PDDR399XYQ-BLM0T1", ['missing_flag']] = 6
-    full_cov_table_CA_CA_df.loc[full_cov_table_CA_CA_df['sample_id'] == "PD-PDDR399XYQ-BLM0T1", ['missing_flag']] = 6
+    full_cov_table_df.loc[full_cov_table_df['sample_id'] == "PD-PDFU000KK6-BLM0T1", ['DoD']] = 2
+    full_cov_table_df.loc[full_cov_table_df['sample_id'] == "PD-PDFU000KK6-BLM0T1", ['missing_flag']] = 2
 
-    full_cov_table.loc[full_cov_table['sample_id'] == "PD-PDFU000KK6-BLM0T1", ['DoD']] = 2
-    full_cov_table_Carrier.loc[full_cov_table_Carrier['sample_id'] == "PD-PDFU000KK6-BLM0T1", ['DoD']] = 2
-    full_cov_table_CC_CN_df.loc[full_cov_table_CC_CN_df['sample_id'] == "PD-PDFU000KK6-BLM0T1", ['DoD']] = 2
-    full_cov_table_CA_CA_df.loc[full_cov_table_CA_CA_df['sample_id'] == "PD-PDFU000KK6-BLM0T1", ['DoD']] = 2
+    condition = full_cov_table_df['DoD'] >= 0
+    full_cov_table_df = full_cov_table_df.loc[condition, :]
 
-    full_cov_table.loc[full_cov_table['sample_id'] == "PD-PDFU000KK6-BLM0T1", ['missing_flag']] = 2
-    full_cov_table_Carrier.loc[full_cov_table_Carrier['sample_id'] == "PD-PDFU000KK6-BLM0T1", ['missing_flag']] = 2
-    full_cov_table_CC_CN_df.loc[full_cov_table_CC_CN_df['sample_id'] == "PD-PDFU000KK6-BLM0T1", ['missing_flag']] = 2
-    full_cov_table_CA_CA_df.loc[full_cov_table_CA_CA_df['sample_id'] == "PD-PDFU000KK6-BLM0T1", ['missing_flag']] = 2
+# print(full_cov_table_caseA_ctrlN_df.shape)
+full_cov_table_df.to_csv(output_folder+"/run_inout/"+Study+"_CaseA_CtrlA_cov.tsv", sep="\t", index=False)
 
-    condition = full_cov_table['DoD'] >= 0
-    full_cov_table = full_cov_table.loc[condition, :]
-
-    condition = full_cov_table_Carrier['DoD'] >= 0
-    full_cov_table_Carrier = full_cov_table_Carrier.loc[condition, :]
-
-    condition = full_cov_table_CC_CN_df['DoD'] >= 0
-    full_cov_table_CC_CN_df = full_cov_table_CC_CN_df.loc[condition, :]
-
-    condition = full_cov_table_CA_CA_df['DoD'] >= 0
-    full_cov_table_CA_CA_df = full_cov_table_CA_CA_df.loc[condition, :]
-
-
-
-full_cov_table.to_csv(output_folder+"/run_inout/"+Study+"_CaseAll_CtrlNonCarrier_covariates.tsv", sep="\t", index=False)
-full_cov_table_Carrier.to_csv(output_folder+"/run_inout/"+Study+"_Ctrl_Carriers_Non_covariates.tsv", sep="\t", index=False)
-full_cov_table_CC_CN_df.to_csv(output_folder+"/run_inout/"+Study+"_CC_CN_covariates.tsv", sep="\t", index=False)
-full_cov_table_CA_CA_df.to_csv(output_folder+"/run_inout/"+Study+"_Case_Ctrl_all_covariates.tsv", sep="\t", index=False)
-
-print(full_cov_table.shape)
-print(full_cov_table_Carrier.shape)
-print(full_cov_table_CC_CN_df.shape)
-print(full_cov_table_CA_CA_df.shape)
+print("=====================================")
+print("CA_CA_cov:",full_cov_table_df.shape)
